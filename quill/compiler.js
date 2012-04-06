@@ -104,8 +104,8 @@ var createSiteDirectory = function(directory, callback) {
   * @param Function callback Callback function
   */
 var createPostDirectory = function(directory, layoutHTML, callback) {
-	var outputFilename;
-	
+  var outputFilename;
+  
   path.exists(directory, function(exists) {
     if(exists) {
       wrench.rmdirSyncRecursive(directory);
@@ -223,11 +223,16 @@ var generateHTMLFiles = function(files, layout, outputDir, config, callback) {
   var counter = 0
     , compileCompleted
     , compiledTemplate
+    , postsTemplate
     , layoutHTML
+    , content
     , file
     , fileStream
     , outputFilename
-    , resultsArray;
+    , resultsArray
+    , index = path.join(layout, '..', 'index.html')
+    , post = path.join(layout, '..', 'post.html');
+    console.log('path', post, ' 2 ', index)
 
 
   compileCompleted = function(posts) {
@@ -245,35 +250,51 @@ var generateHTMLFiles = function(files, layout, outputDir, config, callback) {
 
     compiledTemplate = hbs.compile(layoutBuffer.toString());
 
-    var indexPosts = [];
+      var indexPosts = [];
 
-    for(var key in files) {
-      file = files[key];
-      var pagePosts = [];
+    fs.readFile(post, function(err, postBuffer) {
 
-      pagePosts.push(file);
-      indexPosts.push(file);
+      postsTemplate = hbs.compile(postBuffer.toString());
 
-      layoutHTML = compiledTemplate({ config: config, posts: pagePosts });
-			
-			var outputFileDir = path.join(outputDir, file.url);
+      for(var key in files) {
+        file = files[key];
+        var pagePosts = [];
 
-			createPostDirectory(outputFileDir, layoutHTML, compileCompleted);
-    }
+        pagePosts.push(file);
+        indexPosts.push(file);
+
+        content = postsTemplate({post: pagePosts});
+
+        console.log('content', content);
+
+        layoutHTML = compiledTemplate({ config: config, content: content });
+        
+        var outputFileDir = path.join(outputDir, file.url);
+
+        createPostDirectory(outputFileDir, layoutHTML, compileCompleted);
+      }
+    });
 
     var sortByTimestamp = function(a, b) {
       return (a.timestamp < b.timestamp) ? 1 : -1;
     }
+    fs.readFile(index, function(err, indexBuffer) {
+
     indexPosts.sort(sortByTimestamp);
 
-    indexHTML = compiledTemplate({ config: config, posts: indexPosts });
+      postsTemplate = hbs.compile(indexBuffer.toString());
 
-    outputFilename = path.join(outputDir, 'index.html');
-    var fileRes = fs.writeFile(outputFilename, indexHTML, function(err) {
-      if(err) {
-        return callback(err);
-      }
-      compileCompleted(indexPosts);
+      content = postsTemplate({ posts: indexPosts });
+
+      indexHTML = compiledTemplate({ config: config, content: content });
+
+      outputFilename = path.join(outputDir, 'index.html');
+      var fileRes = fs.writeFile(outputFilename, indexHTML, function(err) {
+        if(err) {
+          return callback(err);
+        }
+        compileCompleted(indexPosts);
+      });
     });
   });
 };
@@ -314,7 +335,7 @@ var compile = function(postsDir, themeDir, siteConfig, callback) {
   var counter = 0
     , files
     , siteDirectory = path.join(__dirname, '..', '_site')
-    , layout = path.join(themeDir, 'index.html');
+    , layout = path.join(themeDir, 'layout.html');
 
   findPosts(postsDir, function(err, result) {
     if(err) {
